@@ -171,7 +171,7 @@ def gather_sentences(samples):
     return sentences
 
 def translate_and_map(sentences, src_lang, tgt_lang, model, tokenizer):
-    translations = dynamic_batch_translate(sentences, "eng_Latn", lang, model, tokenizer)
+    translations = dynamic_batch_translate(sentences, "eng_Latn", tgt_lang, model, tokenizer)
     return dict(zip(sentences, translations))
 
 
