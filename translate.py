@@ -2,8 +2,8 @@ import re
 import torch
 from datasets import load_dataset,Dataset
 from transformers import AutoModelForSeq2SeqLM, BitsAndBytesConfig
-from IndicTransTokenizer.utils import preprocess_batch, postprocess_batch
-from IndicTransTokenizer.tokenizer import IndicTransTokenizer
+from IndicTrans2.huggingface_inference.IndicTransTokenizer.utils import preprocess_batch, postprocess_batch
+from IndicTrans2.huggingface_inference.IndicTransTokenizer.tokenizer import IndicTransTokenizer
 from tqdm import tqdm
 import logging
 import random
@@ -18,7 +18,7 @@ en_indic_ckpt_dir = "ai4bharat/indictrans2-en-indic-dist-200M"
 BATCH_SIZE = 128
 DEVICE = "cuda"
 TARGET_LANGUAGES = ["hin_Deva","tam_Taml","mar_Deva","mal_Mlym","kan_Knda"]  # Hindi, Tamil, Malayalam, Marathi, Kannada
-NUM_SAMPLES = 12000
+NUM_SAMPLES = 12
 # TARGET_LANGUAGES = ["hin_Deva",]  # Hindi
 # Helper Functions
 def initialize_model_and_tokenizer(ckpt_dir, direction, quantization=""):
@@ -38,18 +38,43 @@ def initialize_model_and_tokenizer(ckpt_dir, direction, quantization=""):
     model.eval()
     return tokenizer, model
 
+def estimate_memory_per_token(tokenizer, model):
+    """
+    Estimates the memory consumption per token.
+    """
+    sample_sentence = "This is a sample sentence for memory estimation."
+    inputs = tokenizer(sample_sentence, return_tensors="pt").to(DEVICE)
+    with torch.no_grad(), torch.cuda.memory_allocated() as mem_before:
+        _ = model.generate(**inputs)
+    mem_after = torch.cuda.memory_allocated()
+    mem_usage = mem_after - mem_before
+    num_tokens = inputs.input_ids.size(1)
+    return mem_usage / num_tokens
 
-
-
-
-def batch_translate(input_sentences, src_lang, tgt_lang, model, tokenizer, initial_batch_size = BATCH_SIZE):
+def dynamic_batch_translate(input_sentences, src_lang, tgt_lang, model, tokenizer):
     translations = []
-    current_batch_size = initial_batch_size
+    memory_per_token = estimate_memory_per_token(tokenizer, model)
+    available_memory = torch.cuda.get_device_properties(0).total_memory
+    max_memory = 0.8 * available_memory  # Use only 80% of total memory
+
     i = 0
     pbar = tqdm(total=len(input_sentences), desc="Translating")
 
     while i < len(input_sentences):
-        current_batch_size = initial_batch_size
+        sentence = input_sentences[i]
+        token_count = len(tokenizer.encode(sentence))
+        estimated_memory = token_count * memory_per_token
+        logger.info(f"estimated memory is {estimated_memory}")
+
+        if estimated_memory < max_memory:
+            current_batch_size = min(int(max_memory / estimated_memory), len(input_sentences) - i)
+            logger.info(f"current batch size is {current_batch_size}")
+        else:
+            logger.error("A single sentence exceeds memory limit. Skipping.")
+            i += 1
+            pbar.update(1)
+            continue
+
         while True:
             try:
                 batch = input_sentences[i: i + current_batch_size]
@@ -88,6 +113,52 @@ def batch_translate(input_sentences, src_lang, tgt_lang, model, tokenizer, initi
     return translations
 
 
+# def batch_translate(input_sentences, src_lang, tgt_lang, model, tokenizer, initial_batch_size = BATCH_SIZE):
+#     translations = []
+#     current_batch_size = initial_batch_size
+#     i = 0
+#     pbar = tqdm(total=len(input_sentences), desc="Translating")
+
+#     while i < len(input_sentences):
+#         current_batch_size = initial_batch_size
+#         while True:
+#             try:
+#                 batch = input_sentences[i: i + current_batch_size]
+
+#                 # Preprocess the batch and extract entity mappings
+#                 batch, entity_map = preprocess_batch(batch, src_lang=src_lang, tgt_lang=tgt_lang)
+
+#                 # Tokenize the batch and generate input encodings
+#                 inputs = tokenizer(batch, src=True, truncation=True, padding="longest", return_tensors="pt", return_attention_mask=True).to(DEVICE)
+
+#                 # Generate translations using the model
+#                 with torch.no_grad():
+#                     generated_tokens = model.generate(**inputs, use_cache=True, min_length=0, max_length=256, num_beams=5, num_return_sequences=1)
+
+#                 # Decode the generated tokens into text
+#                 generated_tokens = tokenizer.batch_decode(generated_tokens.detach().cpu().tolist(), src=False)
+
+#                 # Postprocess the translations, including entity replacement
+#                 translations += postprocess_batch(generated_tokens, lang=tgt_lang, placeholder_entity_map=entity_map)
+
+#                 del inputs
+#                 torch.cuda.empty_cache()
+
+#                 pbar.update(current_batch_size)
+#                 i += current_batch_size  # Move to the next batch
+#                 break
+#             except RuntimeError as e:
+#                 if 'out of memory' in str(e) and current_batch_size > 1:
+#                     logger.warning(f"OOM error caught during translation, reducing batch size to {current_batch_size // 2}")
+#                     current_batch_size //= 2  # Reduce the batch size
+#                     torch.cuda.empty_cache()
+#                 else:
+#                     raise e  # If not OOM, or batch size is 1, re-raise the exception
+
+#     pbar.close()
+#     return translations
+
+
 def gather_sentences(samples):
     sentences = []
     for sample in samples:
@@ -100,7 +171,7 @@ def gather_sentences(samples):
     return sentences
 
 def translate_and_map(sentences, src_lang, tgt_lang, model, tokenizer):
-    translations = batch_translate(sentences, src_lang, tgt_lang, model, tokenizer)
+    translations = dynamic_batch_translate(sentences, "eng_Latn", lang, model, tokenizer)
     return dict(zip(sentences, translations))
 
 

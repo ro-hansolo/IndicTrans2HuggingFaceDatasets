@@ -47,8 +47,7 @@ python3 -m pip install bitsandbytes scipy accelerate datasets
 # build the cpp binaries from the source repo in order to use the command line utility
 # source repo: https://github.com/google/sentencepiece
 python3 -m pip install sentencepiece
+git submodule add https://github.com/AI4Bharat/IndicTrans2.git
 
-
-huggingface-cli login
 
 echo "Setup completed!"
