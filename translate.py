@@ -43,7 +43,7 @@ def estimate_memory_per_token(tokenizer, model):
     Estimates the memory consumption per token.
     """
     sample_sentence = "This is a sample sentence for memory estimation."
-    inputs = tokenizer(sample_sentence, src=True, return_tensors="pt").to(DEVICE)
+    inputs = tokenizer([sample_sentence], src=True, return_tensors="pt").to(DEVICE)
     
     torch.cuda.empty_cache()  # Clear cache to get a clean measurement
     mem_before = torch.cuda.memory_allocated()
