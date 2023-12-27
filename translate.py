@@ -67,7 +67,7 @@ def dynamic_batch_translate(input_sentences, src_lang, tgt_lang, model, tokenize
 
     while i < len(input_sentences):
         sentence = input_sentences[i]
-        token_count = len(tokenizer.encode(sentence))
+        token_count = len(tokenizer.encoder(sentence))
         estimated_memory = token_count * memory_per_token
         logger.info(f"estimated memory is {estimated_memory}")
 
