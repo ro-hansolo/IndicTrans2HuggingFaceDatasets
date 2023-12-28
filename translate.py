@@ -248,7 +248,6 @@ def main():
         # Replace original sentences with translated ones
         for sample in groups[TARGET_LANGUAGES.index(lang)]:
             sample['lang'] = lang
-            print(sample)
             for message in sample['messages']:
                 if message['role'] != 'system':
                     translated_content = ' '.join([translations.get(sentence, sentence) for sentence in re.split(r'(?<=[.!?;:])\s+', message['content'])])
@@ -261,7 +260,6 @@ def main():
     final_samples = sum(groups, [])
     final_dataset = Dataset.from_pandas(pd.DataFrame(final_samples))
     final_dataset.save_to_disk("ultrachat_multilingual")
-    final_dataset.push_to_hub("rohansolo/BB-Ultrachat-IndicLingual6-12k")
 
 if __name__ == "__main__":
     main()
