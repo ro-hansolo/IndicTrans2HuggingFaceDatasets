@@ -18,7 +18,7 @@ en_indic_ckpt_dir = "ai4bharat/indictrans2-en-indic-dist-200M"
 BATCH_SIZE = 128
 DEVICE = "cuda"
 TARGET_LANGUAGES = ["hin_Deva","tam_Taml","mar_Deva","mal_Mlym","kan_Knda"]  # Hindi, Tamil, Malayalam, Marathi, Kannada
-NUM_SAMPLES = 12
+NUM_SAMPLES = 6
 # TARGET_LANGUAGES = ["hin_Deva",]  # Hindi
 # Helper Functions
 def initialize_model_and_tokenizer(ckpt_dir, direction, quantization=""):
@@ -42,18 +42,22 @@ def estimate_memory_per_token(tokenizer, model):
     """
     Estimates the memory consumption per token.
     """
-    sample_sentence = "This is a sample sentence for memory estimation."
-    inputs = tokenizer([sample_sentence], src=True, return_tensors="pt").to(DEVICE)
-    
+    sample_sentence = "This is a sample sentence for memory estimation. What do you think this sentence does? It is used to estimate the memory consumption per token. Potatoes are great."
+    translations = []
     torch.cuda.empty_cache()  # Clear cache to get a clean measurement
     mem_before = torch.cuda.memory_allocated()
-    
+    batch, entity_map = preprocess_batch([sample_sentence], src_lang="eng_Latn", tgt_lang="hin_Deva")
+    inputs = tokenizer(batch, src=True, truncation=True, padding="longest", return_tensors="pt", return_attention_mask=True).to(DEVICE)
     with torch.no_grad():
-        _ = model.generate(**inputs)
-    
+        _ = model.generate(**inputs, use_cache=True, min_length=0, max_length=256, num_beams=5, num_return_sequences=1)
+    generated_tokens = tokenizer.batch_decode(generated_tokens.detach().cpu().tolist(), src=False)
+
+    # Postprocess the translations, including entity replacement
+    translations += postprocess_batch(generated_tokens, lang="hin_Deva", placeholder_entity_map=entity_map)
     mem_after = torch.cuda.memory_allocated()
     mem_usage = mem_after - mem_before
-    num_tokens = inputs.input_ids.size(1)
+    num_tokens = len(inputs)
+    torch.cuda.empty_cache()
     return mem_usage / num_tokens
 
 def dynamic_batch_translate(input_sentences, src_lang, tgt_lang, model, tokenizer):
@@ -67,7 +71,7 @@ def dynamic_batch_translate(input_sentences, src_lang, tgt_lang, model, tokenize
 
     while i < len(input_sentences):
         sentence = input_sentences[i]
-        token_count = len(tokenizer.encoder(sentence))
+        token_count = len(tokenizer([sentence], src=True, truncation=True, padding="longest", return_tensors="pt", return_attention_mask=True).to(DEVICE))
         estimated_memory = token_count * memory_per_token
         logger.info(f"estimated memory is {estimated_memory}")
 
