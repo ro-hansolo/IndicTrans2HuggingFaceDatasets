@@ -56,7 +56,9 @@ def estimate_memory_per_token(tokenizer, model):
     translations += postprocess_batch(generated_tokens, lang="hin_Deva", placeholder_entity_map=entity_map)
     mem_after = torch.cuda.memory_allocated()
     mem_usage = mem_after - mem_before
-    num_tokens = len(inputs)
+    num_tokens = inputs['input_ids'].size(1)
+    print(inputs)
+    print(num_tokens)
     torch.cuda.empty_cache()
     return mem_usage / num_tokens
 
@@ -71,7 +73,8 @@ def dynamic_batch_translate(input_sentences, src_lang, tgt_lang, model, tokenize
 
     while i < len(input_sentences):
         sentence = input_sentences[i]
-        token_count = len(tokenizer([sentence], src=True, truncation=True, padding="longest", return_tensors="pt", return_attention_mask=True).to(DEVICE))
+        input_x = tokenizer([sentence], src=True, truncation=True, padding="longest", return_tensors="pt", return_attention_mask=True).to(DEVICE)
+        token_count = input_x['input_ids'].size(1)
         estimated_memory = token_count * memory_per_token
         logger.info(f"estimated memory is {estimated_memory}")
 
