@@ -18,7 +18,7 @@ en_indic_ckpt_dir = "ai4bharat/indictrans2-en-indic-dist-200M"
 BATCH_SIZE = 128
 DEVICE = "cuda"
 TARGET_LANGUAGES = ["hin_Deva","tam_Taml","mar_Deva","mal_Mlym","kan_Knda"]  # Hindi, Tamil, Malayalam, Marathi, Kannada
-NUM_SAMPLES = 6
+NUM_SAMPLES = 48
 # TARGET_LANGUAGES = ["hin_Deva",]  # Hindi
 # Helper Functions
 def initialize_model_and_tokenizer(ckpt_dir, direction, quantization=""):
@@ -258,8 +258,12 @@ def main():
 
     # Combine all groups into a single dataset
     final_samples = sum(groups, [])
-    final_dataset = Dataset.from_pandas(pd.DataFrame(final_samples))
+    df = pd.DataFrame(final_samples)
+    
+    final_dataset = Dataset.from_pandas(df)
+    df.to_csv("ultrachat_multilingual.csv")
     final_dataset.save_to_disk("ultrachat_multilingual")
+    
 
 if __name__ == "__main__":
     main()
