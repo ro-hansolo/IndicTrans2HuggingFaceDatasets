@@ -50,7 +50,7 @@ def estimate_memory_per_token(tokenizer, model):
     inputs = tokenizer(batch, src=True, truncation=True, padding="longest", return_tensors="pt", return_attention_mask=True).to(DEVICE)
     with torch.no_grad():
         _ = model.generate(**inputs, use_cache=True, min_length=0, max_length=256, num_beams=5, num_return_sequences=1)
-    generated_tokens = tokenizer.batch_decode(generated_tokens.detach().cpu().tolist(), src=False)
+    generated_tokens = tokenizer.batch_decode(_.detach().cpu().tolist(), src=False)
 
     # Postprocess the translations, including entity replacement
     translations += postprocess_batch(generated_tokens, lang="hin_Deva", placeholder_entity_map=entity_map)
