@@ -1,5 +1,9 @@
 # IndicTrans2HuggingFaceDatasets
- A script to use IndicTrans2 efficiently to create a balanced multilingual Indic Dataset from UltraChat 200k dataset.
+ 
+* currently experimenting with Dynamic batch sizes as optimum batch sizing could improve speeds drastically!
+
+
+A script to use IndicTrans2 efficiently to create a balanced multilingual Indic Dataset from UltraChat 200k dataset.
 
  Part of an ongoing project at bhaiyabot.com to create mujltilingual Indic datasets which can improve model performance while giving ability for generalisation accross languages.
 
